@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../ffi/ncm_decoder.dart';
+import '../services/ncm_decoder.dart';
 import '../models/ncm_file.dart';
 import '../services/settings_service.dart';
 import '../../widgets/progress_card.dart';

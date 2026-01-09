@@ -71,8 +71,4 @@ app.*.map.json
 crash_log.txt
 *.stackdump
 
-# Native build directories
-/native/build/
-/native/.gradle/
-/native/target/
 build-apk.lnk
