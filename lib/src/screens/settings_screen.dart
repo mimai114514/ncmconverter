@@ -1,6 +1,7 @@
 /// 设置页面
 
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/settings_service.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -100,12 +101,95 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showAboutDialog(BuildContext context) {
-    showAboutDialog(
+    showDialog(
       context: context,
-      applicationName: 'NCM 解密器',
-      applicationVersion: '1.0.0',
-      applicationLegalese: '© 2026 NCM Decoder',
-      children: [const SizedBox(height: 16), const Text('一个用于解密 NCM 音乐文件的工具。')],
+      builder: (context) => AlertDialog(
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 16),
+            // 应用图标
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Image.asset(
+                'assets/icon-ncmconverter-v1.png',
+                width: 80,
+                height: 80,
+              ),
+            ),
+            const SizedBox(height: 16),
+            // 应用名
+            const Text(
+              'NCM Converter',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 4),
+            // 应用包名
+            Text(
+              'io.github.mimai114514.ncmconverter',
+              style: TextStyle(
+                fontSize: 14,
+                color: Theme.of(context).colorScheme.outline,
+              ),
+            ),
+            const SizedBox(height: 8),
+            // 版本信息
+            Text(
+              'v1.0.0',
+              style: TextStyle(
+                fontSize: 14,
+                color: Theme.of(context).colorScheme.outline,
+              ),
+            ),
+            const SizedBox(height: 16),
+            //开发者信息
+            Text('Developed by Infinity.', style: TextStyle(fontSize: 16)),
+            const SizedBox(height: 12),
+            // Github 链接
+            InkWell(
+              onTap: () async {
+                final url = Uri.parse(
+                  'https://github.com/mimai114514/ncmconverter',
+                );
+                if (await canLaunchUrl(url)) {
+                  await launchUrl(url, mode: LaunchMode.externalApplication);
+                }
+              },
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 4,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.code,
+                      size: 20,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '在 GitHub 上查看',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.primary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('完成'),
+          ),
+        ],
+      ),
     );
   }
 }

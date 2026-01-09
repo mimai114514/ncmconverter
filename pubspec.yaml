@@ -75,6 +75,10 @@
     # the material Icons class.
     uses-material-design: true
 
+    # 应用资产文件
+    assets:
+      - assets/icon-ncmconverter-v1.png
+
     # To add assets to your application, add an assets section, like this:
     # assets:
     #   - images/a_dot_burr.jpeg

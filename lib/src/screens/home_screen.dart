@@ -33,7 +33,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('NCM 解密器'),
+        title: const Text('NCM Converter'),
         backgroundColor: theme.colorScheme.inversePrimary,
         actions: [
           IconButton(
