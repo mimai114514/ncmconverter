@@ -7,6 +7,7 @@ plugins {
 
 import java.util.Properties
 import java.io.FileInputStream
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 android {
     namespace = "io.github.mimai114514.ncmconverter"
@@ -18,8 +19,10 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_17.toString()
+    kotlin {
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_17)
+        }
     }
 
     defaultConfig {
@@ -51,8 +54,8 @@ android {
     buildTypes {
         release {
             signingConfig = if (keystorePropertiesFile.exists()) signingConfigs.getByName("release") else signingConfigs.getByName("debug")
-            minifyEnabled = true // Optional: Enable R8 code shrinking
-            shrinkResources = true // Optional: Remove unused resources
+            isMinifyEnabled = true // 启用 R8 代码压缩
+            isShrinkResources = true // 移除未使用的资源
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }

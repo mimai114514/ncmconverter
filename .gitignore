@@ -75,3 +75,4 @@ crash_log.txt
 /native/build/
 /native/.gradle/
 /native/target/
+build-apk.lnk

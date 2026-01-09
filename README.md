@@ -1,58 +1,48 @@
-# NCM 解密器 Flutter 版
+# NCM Converter
 
-一个用于解密网易云音乐 NCM 格式文件的 Flutter 应用，支持 Windows/Android 平台。
+## 简介
 
-注意：应用还处于早期开发阶段，预计还将进行大量改动（包括更改安卓版包名）
+一个用于转换网易云音乐 .ncm 格式文件的 Flutter 应用，支持 Windows/Android 平台。
 
 ## 特性
 
-- ✅ 选择输入文件夹，批量处理所有 NCM 文件
-- ✅ 自定义输出目录
-- ✅ 实时显示解密进度
-- ✅ Material Design 3 界面
-- ✅ 支持 Android 7.0+
+- ✅ 对指定文件夹的 .ncm 文件进行批量处理
+- ✅ 现代的 Material Design 3 界面
+- ✅ 支持 Android 7.0+ / Windows 10+ (64bit)
 
-## 快速开始
+## 截图
 
-```bash
-# 获取依赖
-flutter pub get
+## 性能测试
 
-# 连接 Android 设备后运行
-flutter run
+WIP
 
-# 构建 APK
-flutter build apk --release
-```
+## 和 [ncmcppGui](https://github.com/Majjcom/ncmppGui) 的对比
 
-## 项目结构
+本项目使用 Flutter 框架，相比 ncmcppGui，本项目具有以下优势：
 
-```
-lib/
-├── main.dart                  # 应用入口
-├── src/
-│   ├── core/
-│   │   └── ncm_dump.dart      # 解密核心（纯 Dart）
-│   ├── ffi/
-│   │   └── ncm_decoder.dart   # 解密器服务
-│   ├── models/
-│   │   └── ncm_file.dart      # 数据模型
-│   └── screens/
-│       └── home_screen.dart   # 主界面
-└── widgets/
-    └── progress_card.dart     # 进度组件
-```
+- 现代的 Material Design 3 界面
+- 支持暗色模式
+- 使用**原生 File Picker**，选取文件夹的效率大幅提高
+
+*btw，ncmcppGui使用的Qt的路径选择器太难用是我开发这个应用的直接诱因*
+
+同时，目前版本的 ncmcovnverter 的性能在体感上和 ncmcppGui 仍有差距，具体的差距有待测试
 
 ## 技术栈
 
 - **Flutter** - 跨平台 UI 框架
 - **pointycastle** - 纯 Dart AES 加密库
-- **file_picker** - 文件/目录选择
 
-## 版权声明
+## 参与贡献
 
-本项目中 .ncm 文件相关处理逻辑改写自开源项目 [ncmpp](https://github.com/Majjcom/ncmpp)
+我们非常欢迎并感谢任何形式的贡献！欢迎提交 Issue 或 Pull Request，但由于个人能力和经验有限，不一定能及时处理。
+
 
 ## 许可证
 
-同原 ncmpp 项目，遵循 MIT 许可证。
+本项目采用 **MIT** 许可证开源。详情请参阅 LICENSE 文件。
+
+## 致谢
+
+* 本项目的灵感来源于 [ncmppGui](https://github.com/Majjcom/ncmppGui)
+* 本项目的 .ncm 文件处理逻辑改写自 [ncmpp](https://github.com/Majjcom/ncmpp)
