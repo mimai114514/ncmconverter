@@ -11,6 +11,20 @@
 - ✅ 支持 Android 7.0+ / Windows 10+ (64bit)
 
 ## 截图
+<table>
+  <tr>
+    <td><img src="https://github.com/user-attachments/assets/abc3d578-ce03-450a-83bc-73be64f4ef02" width=200></td>
+    <td><img src="https://github.com/user-attachments/assets/6ac1dd39-6375-4369-b8d9-1950edb6f29a" width=200></td>
+    <td><img src="https://github.com/user-attachments/assets/43a4099b-a684-42ca-9f08-b7d1e2beb1ad" width=200></td>
+  </tr>
+</table>
+<table>
+  <tr> 
+    <td><img src="https://github.com/user-attachments/assets/b7e7e119-a844-45c3-a586-990f114a5155" width=300></td>
+    <td><img src="https://github.com/user-attachments/assets/3af443a3-4615-43ec-a6ba-1ee7a2e5d0e6" width=300></td>
+  </tr>
+</table>
+
 
 ## 性能测试
 
