@@ -40,11 +40,6 @@ ncmpp-flutter/
 │   │       └── settings_service.dart # 设置服务
 │   └── widgets/
 │       └── progress_card.dart    # 进度卡片组件
-├── native/                       # 原生代码（已弃用，使用纯 Dart 实现）
-│   ├── CMakeLists.txt
-│   ├── ncm_ffi.cpp
-│   ├── ncm_ffi.h
-│   └── ncmlib/                   # C++ 解密库
 ├── android/                      # Android 平台配置
 ├── windows/                      # Windows 平台配置
 ├── pubspec.yaml                  # 项目依赖配置
@@ -164,14 +159,4 @@ ncmpp-flutter/
 - ✅ 支持明暗主题自动切换
 - ✅ 支持 Android 7.0+ 和 Windows
 
----
 
-## 开发状态
-
-> ⚠️ 应用还处于早期开发阶段，预计还将进行大量改动（包括更改安卓版包名）
-
----
-
-## 许可证
-
-遵循 MIT 许可证，与原 ncmpp 项目保持一致。

@@ -1,10 +1,11 @@
 /// NCM 解密器服务
-/// 提供高层封装，支持 Isolate 后台解密
+/// 提供高层封装，支持 Isolate 池后台解密
 
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import '../core/ncm_dump.dart';
+import 'isolate_pool.dart';
 
 /// 解密结果
 class DecodeResult {
@@ -19,6 +20,16 @@ class DecodeResult {
     required this.success,
     this.errorMessage,
   });
+
+  /// 从 DecodeTaskResult 转换
+  factory DecodeResult.fromTaskResult(DecodeTaskResult result) {
+    return DecodeResult(
+      inputPath: result.inputPath,
+      outputPath: result.outputPath,
+      success: result.success,
+      errorMessage: result.errorMessage,
+    );
+  }
 
   @override
   String toString() {
@@ -53,12 +64,49 @@ class NcmDecoder {
   static final NcmDecoder _instance = NcmDecoder._();
   static NcmDecoder get instance => _instance;
 
+  IsolatePool? _pool;
+  bool _usePool = true; // 是否使用 Isolate 池
+
   NcmDecoder._();
 
+  /// 预热 Isolate 池
+  /// 建议在应用启动时调用
+  Future<void> warmUp([int? count]) async {
+    if (!_usePool) return;
+
+    _pool ??= IsolatePool(maxSize: 32);
+    await _pool!.warmUp(count);
+  }
+
+  /// 销毁 Isolate 池
+  Future<void> dispose() async {
+    await _pool?.dispose();
+    _pool = null;
+  }
+
   /// 解密单个文件（在后台 Isolate 执行）
-  Future<DecodeResult> decodeFile(String inputPath, String outputDir) async {
-    final result = await compute(_decodeInIsolate, [inputPath, outputDir]);
-    return result;
+  /// [useStreaming] 是否使用流式解密，默认 true（减少内存占用）
+  Future<DecodeResult> decodeFile(
+    String inputPath,
+    String outputDir, {
+    bool useStreaming = true,
+  }) async {
+    if (_usePool) {
+      // 使用 Isolate 池
+      _pool ??= IsolatePool(maxSize: 32);
+      final result = await _pool!.runDecode(
+        DecodeTask(inputPath, outputDir, useStreaming: useStreaming),
+      );
+      return DecodeResult.fromTaskResult(result);
+    } else {
+      // 回退到 compute
+      final result = await compute(_decodeInIsolate, [
+        inputPath,
+        outputDir,
+        useStreaming.toString(),
+      ]);
+      return result;
+    }
   }
 
   /// 扫描目录中的所有 NCM 文件
@@ -145,8 +193,13 @@ class NcmDecoder {
     }
 
     // 限制并发数在合理范围内
-    final effectiveConcurrency = concurrency.clamp(1, 16);
+    final effectiveConcurrency = concurrency.clamp(1, 32);
     debugPrint('[NCM解密] 使用 $effectiveConcurrency 个并行任务');
+
+    // 预热 Isolate 池
+    if (_usePool) {
+      await warmUp(effectiveConcurrency);
+    }
 
     // 使用 StreamController 来汇报进度
     final progressController = StreamController<BatchDecodeProgress>();
@@ -222,19 +275,19 @@ class NcmDecoder {
   }
 
   /// 获取版本
-  String getVersion() => '1.0.0';
+  String getVersion() => '1.1.0';
 }
 
-/// Isolate 中执行的解密函数
+/// Isolate 中执行的解密函数（用于回退模式）
 Future<DecodeResult> _decodeInIsolate(List<String> args) async {
   final inputPath = args[0];
   final outputDir = args[1];
+  final useStreaming = args.length > 2 ? args[2] == 'true' : true;
 
   final ncmDump = NcmDump();
-  final (success, outputPath, errorMessage) = await ncmDump.decode(
-    inputPath,
-    outputDir,
-  );
+  final (success, outputPath, errorMessage) = useStreaming
+      ? await ncmDump.decodeStreaming(inputPath, outputDir)
+      : await ncmDump.decode(inputPath, outputDir);
 
   return DecodeResult(
     inputPath: inputPath,

@@ -18,9 +18,12 @@ class SettingsService {
   static const String _keyThreadCount = 'thread_count';
 
   /// 默认线程数（基于CPU核心数，最小1，最大16）
+  /// 最大允许线程数
+  static const int maxThreadCount = 32;
+
   static int get defaultThreadCount {
     final cpuCount = Platform.numberOfProcessors;
-    return cpuCount.clamp(1, 16);
+    return cpuCount.clamp(1, maxThreadCount);
   }
 
   /// 初始化设置服务
@@ -36,7 +39,7 @@ class SettingsService {
 
   /// 设置线程数
   Future<void> setThreadCount(int count) async {
-    final clampedCount = count.clamp(1, 16);
+    final clampedCount = count.clamp(1, maxThreadCount);
     await _prefs?.setInt(_keyThreadCount, clampedCount);
     debugPrint('[设置服务] 线程数已设置为: $clampedCount');
   }

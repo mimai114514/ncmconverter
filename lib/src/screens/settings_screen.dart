@@ -52,15 +52,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     child: Slider(
                       value: _threadCount.toDouble(),
                       min: 1,
-                      max: 16,
-                      divisions: 15,
+                      max: 32,
+                      divisions: 31,
                       label: '$_threadCount',
                       onChanged: (value) => _updateThreadCount(value.round()),
                     ),
                   ),
                   IconButton(
                     icon: const Icon(Icons.add_circle_outline),
-                    onPressed: _threadCount < 16
+                    onPressed: _threadCount < 32
                         ? () => _updateThreadCount(_threadCount + 1)
                         : null,
                   ),
@@ -93,7 +93,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _updateThreadCount(int count) {
-    final clampedCount = count.clamp(1, 16);
+    final clampedCount = count.clamp(1, SettingsService.maxThreadCount);
     setState(() {
       _threadCount = clampedCount;
     });

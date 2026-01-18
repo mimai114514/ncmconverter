@@ -124,6 +124,159 @@ class NcmDump {
     }
   }
 
+  /// 流式解密 NCM 文件
+  /// 使用流式 I/O 减少内存占用，适合大文件
+  /// 返回 (成功, 输出路径, 错误信息)
+  Future<(bool, String, String?)> decodeStreaming(
+    String inputPath,
+    String outputDir, {
+    int bufferSize = 65536, // 64KB 缓冲区
+  }) async {
+    RandomAccessFile? raf;
+    IOSink? outputSink;
+
+    try {
+      final file = File(inputPath);
+      if (!await file.exists()) {
+        return (false, '', '文件不存在: $inputPath');
+      }
+
+      raf = await file.open(mode: FileMode.read);
+
+      // 验证魔数
+      final magic = await raf.read(8);
+      if (!_listEquals(Uint8List.fromList(magic), _ncmMagic)) {
+        await raf.close();
+        return (false, '', '无效的 NCM 文件格式');
+      }
+
+      // 跳过 2 字节
+      await raf.setPosition(await raf.position() + 2);
+
+      // 读取并解密密钥
+      final keyLengthBytes = await raf.read(4);
+      final keyLength = _readLittleEndianUint32(
+        Uint8List.fromList(keyLengthBytes),
+      );
+      final keyData = Uint8List.fromList(await raf.read(keyLength));
+
+      // XOR 0x64
+      for (var i = 0; i < keyData.length; i++) {
+        keyData[i] ^= 0x64;
+      }
+
+      // AES-ECB 解密
+      final decryptedKey = _aesEcbDecrypt(keyData, _coreKey);
+      final unpaddedKey = _pkcs7Unpad(decryptedKey);
+
+      // 跳过 "neteasecloudmusic" 前缀 (17 bytes)
+      final keyBox = _buildKeyBox(unpaddedKey.sublist(17));
+
+      // 读取元数据
+      final metaLengthBytes = await raf.read(4);
+      final metaLength = _readLittleEndianUint32(
+        Uint8List.fromList(metaLengthBytes),
+      );
+      final metaData = Uint8List.fromList(await raf.read(metaLength));
+
+      // XOR 0x63
+      for (var i = 0; i < metaData.length; i++) {
+        metaData[i] ^= 0x63;
+      }
+
+      // 跳过 "163 key(Don't modify):" 前缀 (22 bytes)，Base64 解码
+      final metaBase64 = utf8.decode(metaData.sublist(22));
+      final metaEncrypted = base64.decode(metaBase64);
+
+      // AES-ECB 解密元数据
+      final metaDecrypted = _aesEcbDecrypt(metaEncrypted, _metaKey);
+      final metaUnpadded = _pkcs7Unpad(metaDecrypted);
+
+      // 跳过 "music:" 前缀 (6 bytes)，解析 JSON
+      final metaJson = utf8.decode(metaUnpadded.sublist(6));
+      final metadata = json.decode(metaJson) as Map<String, dynamic>;
+
+      // 跳过 CRC 和间隔
+      await raf.setPosition(await raf.position() + 4 + 5);
+
+      // 跳过图片
+      final imageLengthBytes = await raf.read(4);
+      final imageLength = _readLittleEndianUint32(
+        Uint8List.fromList(imageLengthBytes),
+      );
+      await raf.setPosition(await raf.position() + imageLength);
+
+      // 获取输出格式
+      final format = metadata['format'] as String? ?? 'mp3';
+
+      // 构建输出路径
+      final inputFileName = inputPath.split(RegExp(r'[/\\]')).last;
+      final baseName = inputFileName.replaceAll(
+        RegExp(r'\.ncm$', caseSensitive: false),
+        '',
+      );
+      var outputPath = outputDir;
+      if (!outputPath.endsWith('/') && !outputPath.endsWith('\\')) {
+        outputPath += Platform.pathSeparator;
+      }
+      outputPath += '$baseName.$format';
+
+      // 记录音频数据起始位置和总长度
+      final audioStartPos = await raf.position();
+      final fileLength = await file.length();
+      final audioLength = fileLength - audioStartPos;
+
+      // 创建输出文件
+      final outputFile = File(outputPath);
+      outputSink = outputFile.openWrite();
+
+      // 流式解密音频数据
+      final buffer = Uint8List(bufferSize);
+      var globalOffset = 0;
+      var remaining = audioLength;
+
+      while (remaining > 0) {
+        final toRead = remaining > bufferSize ? bufferSize : remaining;
+        final bytesRead = await raf.readInto(buffer, 0, toRead);
+
+        if (bytesRead == 0) break;
+
+        // 解密当前块
+        for (var i = 0; i < bytesRead; i++) {
+          final j = (globalOffset + i + 1) & 0xff;
+          buffer[i] ^=
+              keyBox[(keyBox[j] + keyBox[(keyBox[j] + j) & 0xff]) & 0xff];
+        }
+
+        // 写入输出
+        outputSink.add(Uint8List.sublistView(buffer, 0, bytesRead));
+
+        globalOffset += bytesRead;
+        remaining -= bytesRead;
+      }
+
+      // 刷新并关闭
+      await outputSink.flush();
+      await outputSink.close();
+      outputSink = null;
+
+      await raf.close();
+      raf = null;
+
+      return (true, outputPath, null);
+    } catch (e) {
+      // 清理资源
+      await outputSink?.close();
+      await raf?.close();
+      return (false, '', '流式解密失败: $e');
+    }
+  }
+
+  /// 从字节数组读取小端序 uint32
+  int _readLittleEndianUint32(Uint8List bytes) {
+    return bytes[0] | (bytes[1] << 8) | (bytes[2] << 16) | (bytes[3] << 24);
+  }
+
   /// 构建 RC4 变种的 KeyBox
   Uint8List _buildKeyBox(Uint8List key) {
     final box = Uint8List(256);
@@ -197,9 +350,9 @@ class _ByteReader {
   _ByteReader(this._data);
 
   Uint8List read(int length) {
-    final result = _data.sublist(_offset, _offset + length);
+    final result = Uint8List.sublistView(_data, _offset, _offset + length);
     _offset += length;
-    return Uint8List.fromList(result);
+    return result;
   }
 
   void skip(int length) {
@@ -212,8 +365,8 @@ class _ByteReader {
   }
 
   Uint8List readRemaining() {
-    final result = _data.sublist(_offset);
+    final result = Uint8List.sublistView(_data, _offset);
     _offset = _data.length;
-    return Uint8List.fromList(result);
+    return result;
   }
 }
