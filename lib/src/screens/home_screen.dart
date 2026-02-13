@@ -186,11 +186,11 @@ class _HomeScreenState extends State<HomeScreen> {
           final isWide = constraints.maxWidth > 600;
 
           if (isWide) {
-            // 双列布局
+            // 双列布局，使用固定高度确保行间距不随宽度变化
             return GridView.builder(
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
-                childAspectRatio: 4.5, // 调整每个项目的宽高比
+                mainAxisExtent: 56, // 固定高度（ListTile 默认高度）
                 crossAxisSpacing: 0,
                 mainAxisSpacing: 0,
               ),
@@ -449,12 +449,16 @@ class _HomeScreenState extends State<HomeScreen> {
                 if (deleteSourceFiles) {
                   await _deleteSuccessfulSourceFiles();
                 }
-                await _openMusicTagEditor();
+                if (Platform.isWindows) {
+                  await _openOutputFolder();
+                } else {
+                  await _openMusicTagEditor();
+                }
                 if (context.mounted) {
                   Navigator.of(context).pop();
                 }
               },
-              child: const Text('打开音乐标签'),
+              child: Text(Platform.isWindows ? '打开文件夹' : '打开音乐标签'),
             ),
             FilledButton(
               onPressed: () async {
@@ -515,6 +519,21 @@ class _HomeScreenState extends State<HomeScreen> {
       debugPrint('[打开应用] 失败: $e');
       if (mounted) {
         _showOpenAppFailedDialog();
+      }
+    }
+  }
+
+  /// 打开输出文件夹（Windows 平台）
+  Future<void> _openOutputFolder() async {
+    if (_outputDir == null) return;
+
+    final uri = Uri.file(_outputDir!);
+    try {
+      await launchUrl(uri);
+    } catch (e) {
+      debugPrint('[打开文件夹] 失败: $e');
+      if (mounted) {
+        _showSnackBar('无法打开文件夹');
       }
     }
   }
