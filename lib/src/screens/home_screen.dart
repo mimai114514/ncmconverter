@@ -371,6 +371,8 @@ class _HomeScreenState extends State<HomeScreen> {
       outputDir: _outputDir!,
       concurrency: SettingsService.instance.threadCount,
       onFileComplete: (result) {
+        if (!mounted) return;
+
         // 更新文件状态
         final index = _files.indexWhere((f) => f.path == result.inputPath);
         if (index >= 0) {
@@ -384,15 +386,19 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       },
     )) {
+      if (!mounted) break;
+
       setState(() {
         _completed = progress.completed;
         _failed = progress.failed;
-        _currentFile = progress.currentFile;
+        _currentFile = progress.currentFile == null
+            ? null
+            : progress.currentFile!.split(RegExp(r'[/\\]')).last;
 
         // 标记当前正在处理的文件
         if (progress.currentFile != null) {
           final index = _files.indexWhere(
-            (f) => f.name == progress.currentFile,
+            (f) => f.path == progress.currentFile,
           );
           if (index >= 0 && _files[index].status == NcmFileStatus.pending) {
             _files[index].status = NcmFileStatus.processing;
@@ -400,6 +406,8 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       });
     }
+
+    if (!mounted) return;
 
     setState(() {
       _isProcessing = false;

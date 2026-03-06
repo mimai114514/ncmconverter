@@ -234,13 +234,16 @@ class NcmDump {
       outputSink = outputFile.openWrite();
 
       // 流式解密音频数据
-      final buffer = Uint8List(bufferSize);
+      final effectiveBufferSize = bufferSize > 0 ? bufferSize : 65536;
+      final effectiveFlushInterval = flushInterval > 0 ? flushInterval : 1;
+      final buffer = Uint8List(effectiveBufferSize);
       var globalOffset = 0;
       var remaining = audioLength;
       var chunkCount = 0; // 块计数器
 
       while (remaining > 0) {
-        final toRead = remaining > bufferSize ? bufferSize : remaining;
+        final toRead =
+            remaining > effectiveBufferSize ? effectiveBufferSize : remaining;
         final bytesRead = await raf.readInto(buffer, 0, toRead);
 
         if (bytesRead == 0) break;
@@ -260,7 +263,7 @@ class NcmDump {
         chunkCount++;
 
         // 定期刷新以防止内存累积
-        if (chunkCount % flushInterval == 0) {
+        if (chunkCount % effectiveFlushInterval == 0) {
           await outputSink.flush();
         }
       }

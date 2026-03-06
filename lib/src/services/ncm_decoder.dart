@@ -248,9 +248,7 @@ class NcmDecoder {
         while (fileIndex < files.length) {
           final idx = fileIndex++;
           final filePath = files[idx];
-          final fileName = filePath.split(Platform.pathSeparator).last;
-
-          currentFileName = fileName;
+          currentFileName = filePath;
           progressController.add(
             BatchDecodeProgress(
               total: total,
