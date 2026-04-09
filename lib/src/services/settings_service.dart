@@ -18,6 +18,8 @@ class SettingsService {
   static const String _keyThreadCount = 'thread_count';
   static const String _keyBufferSize = 'buffer_size';
   static const String _keyFlushInterval = 'flush_interval';
+  static const String _keyInputDir = 'input_dir';
+  static const String _keyOutputDir = 'output_dir';
 
   /// 默认线程数（基于CPU核心数，最小1，最大16）
   /// 最大允许线程数
@@ -78,6 +80,30 @@ class SettingsService {
     final clampedInterval = interval.clamp(minFlushInterval, maxFlushInterval);
     await _prefs?.setInt(_keyFlushInterval, clampedInterval);
     debugPrint('[设置服务] 刷新间隔已设置为: 每 $clampedInterval 块');
+  }
+
+  /// 获取上次输入目录
+  String? get inputDir => _prefs?.getString(_keyInputDir);
+
+  /// 设置输入目录
+  Future<void> setInputDir(String? dir) async {
+    if (dir == null) {
+      await _prefs?.remove(_keyInputDir);
+    } else {
+      await _prefs?.setString(_keyInputDir, dir);
+    }
+  }
+
+  /// 获取上次输出目录
+  String? get outputDir => _prefs?.getString(_keyOutputDir);
+
+  /// 设置输出目录
+  Future<void> setOutputDir(String? dir) async {
+    if (dir == null) {
+      await _prefs?.remove(_keyOutputDir);
+    } else {
+      await _prefs?.setString(_keyOutputDir, dir);
+    }
   }
 
   /// 获取格式化的缓冲区大小显示文本

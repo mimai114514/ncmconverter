@@ -47,12 +47,14 @@ class BatchDecodeProgress {
   final int total;
   final int completed;
   final int failed;
+  final int skipped;
   final String? currentFile;
 
   BatchDecodeProgress({
     required this.total,
     required this.completed,
     required this.failed,
+    this.skipped = 0,
     this.currentFile,
   });
 
@@ -197,13 +199,58 @@ class NcmDecoder {
     void Function(DecodeResult)? onFileComplete,
   }) async* {
     // 扫描所有 NCM 文件
-    final files = await scanNcmFiles(inputDir);
+    final allFiles = await scanNcmFiles(inputDir);
+
+    if (allFiles.isEmpty) {
+      yield BatchDecodeProgress(total: 0, completed: 0, failed: 0);
+      return;
+    }
+
+    // 过滤已转换的文件（检查输出目录是否已存在 .mp3 或 .flac）
+    final files = <String>[];
+    final skippedFiles = <String>[];
+    for (final filePath in allFiles) {
+      final fileName = filePath.split(RegExp(r'[/\\]')).last;
+      final baseName = fileName.replaceAll(
+        RegExp(r'\.ncm$', caseSensitive: false),
+        '',
+      );
+      final outBase = outputDir.endsWith('/') || outputDir.endsWith('\\')
+          ? outputDir
+          : outputDir + Platform.pathSeparator;
+      final mp3Exists = await File('${outBase}$baseName.mp3').exists();
+      final flacExists = await File('${outBase}$baseName.flac').exists();
+      if (mp3Exists || flacExists) {
+        skippedFiles.add(filePath);
+        debugPrint('[解密服务] 跳过已存在: $baseName');
+      } else {
+        files.add(filePath);
+      }
+    }
+
+    final skippedCount = skippedFiles.length;
+    if (skippedCount > 0) {
+      debugPrint('[解密服务] 跳过 $skippedCount 个已转换文件');
+    }
+
+    // 通知调用方哪些文件被跳过
+    for (final skippedPath in skippedFiles) {
+      onFileComplete?.call(
+        DecodeResult(
+          inputPath: skippedPath,
+          outputPath: '',
+          success: false,
+          errorMessage: '已跳过（输出文件已存在）',
+        ),
+      );
+    }
+
     final total = files.length;
     var completed = 0;
     var failed = 0;
 
     if (total == 0) {
-      yield BatchDecodeProgress(total: 0, completed: 0, failed: 0);
+      yield BatchDecodeProgress(total: 0, completed: 0, failed: 0, skipped: skippedCount);
       return;
     }
 
@@ -256,6 +303,7 @@ class NcmDecoder {
               total: total,
               completed: completed,
               failed: failed,
+              skipped: skippedCount,
               currentFile: currentFileName,
             ),
           );
@@ -297,7 +345,7 @@ class NcmDecoder {
 
       // 发送最终进度
       progressController.add(
-        BatchDecodeProgress(total: total, completed: completed, failed: failed),
+        BatchDecodeProgress(total: total, completed: completed, failed: failed, skipped: skippedCount),
       );
 
       await progressController.close();

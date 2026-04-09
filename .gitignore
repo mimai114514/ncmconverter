@@ -18,10 +18,8 @@ migrate_working_dir/
 *.iws
 .idea/
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
+# VS Code
+.vscode/
 
 # Flutter/Dart/Pub related
 **/doc/api/
@@ -35,6 +33,7 @@ migrate_working_dir/
 /build/
 /coverage/
 pubspec.lock
+.metadata
 
 # Symbolication related
 app.*.symbols
@@ -47,8 +46,9 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-# Android signing - 敏感文件，不要提交到版本控制
+# Android signing - 敏感文件
 /android/key.properties
+/android/local.properties
 /android/app/*.jks
 /android/app/*.keystore
 *.jks
@@ -71,6 +71,7 @@ app.*.map.json
 crash_log.txt
 *.stackdump
 
-build-apk.lnk
+# IDE / OS shortcuts
+*.lnk
 devtools_options.yaml
-Release-Windows.lnk
+

@@ -23,9 +23,40 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _outputDir;
   List<NcmFile> _files = [];
   bool _isProcessing = false;
+  bool _isScanning = false;
   int _completed = 0;
   int _failed = 0;
+  int _skipped = 0;
   String? _currentFile;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedDirectories();
+  }
+
+  Future<void> _loadSavedDirectories() async {
+    final settings = SettingsService.instance;
+    final savedInput = settings.inputDir;
+    final savedOutput = settings.outputDir;
+
+    if (savedInput != null && Directory(savedInput).existsSync()) {
+      setState(() {
+        _inputDir = savedInput;
+        _isScanning = true;
+      });
+      final decoder = NcmDecoder.instance;
+      final filePaths = await decoder.scanNcmFiles(savedInput);
+      setState(() {
+        _files = filePaths.map((p) => NcmFile.fromPath(p)).toList();
+        _isScanning = false;
+      });
+    }
+
+    if (savedOutput != null && Directory(savedOutput).existsSync()) {
+      setState(() => _outputDir = savedOutput);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -63,7 +94,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   title: '输入目录',
                   subtitle: _inputDir ?? '请选择包含 NCM 文件的文件夹',
                   icon: Icons.folder_open,
-                  onTap: _isProcessing ? null : _selectInputDirectory,
+                  onTap: (_isProcessing || _isScanning) ? null : _selectInputDirectory,
                   color: theme.colorScheme.primaryContainer,
                 );
 
@@ -71,7 +102,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   title: '输出目录',
                   subtitle: _outputDir ?? '请选择解密后文件的保存位置',
                   icon: Icons.folder_copy,
-                  onTap: _isProcessing ? null : _selectOutputDirectory,
+                  onTap: (_isProcessing || _isScanning) ? null : _selectOutputDirectory,
                   color: theme.colorScheme.secondaryContainer,
                 );
 
@@ -108,6 +139,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   total: _files.length,
                   completed: _completed,
                   failed: _failed,
+                  skipped: _skipped,
                   currentFile: _currentFile,
                   isProcessing: _isProcessing,
                 ),
@@ -156,6 +188,28 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildFileList() {
+    if (_isScanning) {
+      return Card(
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const SizedBox(
+                width: 48,
+                height: 48,
+                child: CircularProgressIndicator(),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                '正在扫描目录...',
+                style: TextStyle(color: Theme.of(context).colorScheme.outline),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     if (_files.isEmpty) {
       return Card(
         child: Center(
@@ -241,11 +295,14 @@ class _HomeScreenState extends State<HomeScreen> {
         return const Icon(Icons.check_circle, color: Colors.green);
       case NcmFileStatus.failed:
         return const Icon(Icons.error, color: Colors.red);
+      case NcmFileStatus.skipped:
+        return const Icon(Icons.skip_next, color: Colors.orange);
     }
   }
 
   bool get _canStart =>
       !_isProcessing &&
+      !_isScanning &&
       _inputDir != null &&
       _outputDir != null &&
       _files.isNotEmpty;
@@ -268,7 +325,9 @@ class _HomeScreenState extends State<HomeScreen> {
         _files = [];
         _completed = 0;
         _failed = 0;
+        _isScanning = true;
       });
+      await SettingsService.instance.setInputDir(result);
 
       // 扫描目录
       final decoder = NcmDecoder.instance;
@@ -276,6 +335,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
       setState(() {
         _files = filePaths.map((p) => NcmFile.fromPath(p)).toList();
+        _isScanning = false;
       });
 
       if (_files.isEmpty) {
@@ -344,6 +404,7 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _outputDir = result;
       });
+      await SettingsService.instance.setOutputDir(result);
     }
   }
 
@@ -354,6 +415,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _isProcessing = true;
       _completed = 0;
       _failed = 0;
+      _skipped = 0;
       for (var file in _files) {
         file.status = NcmFileStatus.pending;
         file.errorMessage = null;
@@ -374,10 +436,15 @@ class _HomeScreenState extends State<HomeScreen> {
         // 更新文件状态
         final index = _files.indexWhere((f) => f.path == result.inputPath);
         if (index >= 0) {
+          final isSkipped = result.errorMessage == '已跳过（输出文件已存在）';
           setState(() {
-            _files[index].status = result.success
-                ? NcmFileStatus.success
-                : NcmFileStatus.failed;
+            if (isSkipped) {
+              _files[index].status = NcmFileStatus.skipped;
+            } else {
+              _files[index].status = result.success
+                  ? NcmFileStatus.success
+                  : NcmFileStatus.failed;
+            }
             _files[index].outputPath = result.outputPath;
             _files[index].errorMessage = result.errorMessage;
           });
@@ -387,6 +454,7 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _completed = progress.completed;
         _failed = progress.failed;
+        _skipped = progress.skipped;
         _currentFile = progress.currentFile;
 
         // 标记当前正在处理的文件
@@ -428,7 +496,7 @@ class _HomeScreenState extends State<HomeScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('$_completed 成功，$_failed 失败，耗时 ${elapsedSeconds}s'),
+              Text('$_completed 成功，$_failed 失败${_skipped > 0 ? '，$_skipped 跳过' : ''}，耗时 ${elapsedSeconds}s'),
               const SizedBox(height: 16),
               CheckboxListTile(
                 value: deleteSourceFiles,

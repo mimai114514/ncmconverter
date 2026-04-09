@@ -6,6 +6,7 @@ class ProgressCard extends StatelessWidget {
   final int total;
   final int completed;
   final int failed;
+  final int skipped;
   final String? currentFile;
   final bool isProcessing;
 
@@ -14,6 +15,7 @@ class ProgressCard extends StatelessWidget {
     required this.total,
     required this.completed,
     required this.failed,
+    this.skipped = 0,
     this.currentFile,
     this.isProcessing = false,
   });
@@ -57,6 +59,14 @@ class ProgressCard extends StatelessWidget {
                       label: '失败',
                       value: failed,
                       color: Colors.red,
+                    ),
+                    const SizedBox(width: 16),
+                    _buildStatItem(
+                      context,
+                      icon: Icons.skip_next,
+                      label: '跳过',
+                      value: skipped,
+                      color: Colors.orange,
                     ),
                   ],
                 ),

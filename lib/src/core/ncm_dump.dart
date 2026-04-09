@@ -252,8 +252,9 @@ class NcmDump {
               keyBox[(keyBox[j] + keyBox[(keyBox[j] + j) & 0xff]) & 0xff];
         }
 
-        // 写入输出
-        outputSink.add(Uint8List.sublistView(buffer, 0, bytesRead));
+        // 写入输出（必须使用 sublist 拷贝，不能用 sublistView 视图，
+        // 否则下一次 readInto 会覆盖尚未刷新的缓冲区数据，导致音频乱序）
+        outputSink.add(buffer.sublist(0, bytesRead));
 
         globalOffset += bytesRead;
         remaining -= bytesRead;

@@ -29,4 +29,5 @@ enum NcmFileStatus {
   processing, // 正在处理
   success, // 处理成功
   failed, // 处理失败
+  skipped, // 已跳过（输出文件已存在）
 }
