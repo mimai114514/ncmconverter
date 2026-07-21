@@ -462,6 +462,11 @@ class _HomeScreenState extends State<HomeScreen> {
   /// 显示解密完成对话框
   void _showCompletionDialog(int elapsedSeconds) {
     bool deleteSourceFiles = false;
+    final canOpenWindowsMusicTag =
+        Platform.isWindows &&
+        SettingsService.instance.windowsMusicTagEnabled &&
+        (SettingsService.instance.windowsMusicTagExecutablePath?.isNotEmpty ??
+            false);
 
     showDialog(
       context: context,
@@ -505,6 +510,19 @@ class _HomeScreenState extends State<HomeScreen> {
               },
               child: Text(Platform.isWindows ? '打开文件夹' : '打开音乐标签'),
             ),
+            if (canOpenWindowsMusicTag)
+              TextButton(
+                onPressed: () async {
+                  if (deleteSourceFiles) {
+                    await _deleteSuccessfulSourceFiles();
+                  }
+                  final opened = await _openWindowsMusicTagEditor();
+                  if (opened && context.mounted) {
+                    Navigator.of(context).pop();
+                  }
+                },
+                child: const Text('打开音乐标签'),
+              ),
             FilledButton(
               onPressed: () async {
                 if (deleteSourceFiles) {
@@ -568,6 +586,37 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  /// 打开 Windows 音乐标签程序
+  Future<bool> _openWindowsMusicTagEditor() async {
+    final executablePath =
+        SettingsService.instance.windowsMusicTagExecutablePath;
+    if (executablePath == null || executablePath.isEmpty) {
+      return false;
+    }
+
+    try {
+      if (!await File(executablePath).exists()) {
+        if (mounted) {
+          _showOpenAppFailedDialog('音乐标签程序路径无效，请在设置中重新选择 .exe 文件。');
+        }
+        return false;
+      }
+
+      await Process.start(
+        executablePath,
+        const [],
+        mode: ProcessStartMode.detached,
+      );
+      return true;
+    } catch (e) {
+      debugPrint('[打开音乐标签] 失败: $e');
+      if (mounted) {
+        _showOpenAppFailedDialog('无法打开音乐标签程序，请确认路径有效且程序可正常运行。');
+      }
+      return false;
+    }
+  }
+
   /// 打开输出文件夹（Windows 平台）
   Future<void> _openOutputFolder() async {
     if (_outputDir == null) return;
@@ -584,12 +633,12 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   /// 显示打开应用失败的对话框
-  void _showOpenAppFailedDialog() {
+  void _showOpenAppFailedDialog([String? message]) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('打开失败'),
-        content: const Text('无法打开音乐标签应用，请确认已安装该应用。'),
+        content: Text(message ?? '无法打开音乐标签应用，请确认已安装该应用。'),
         actions: [
           FilledButton(
             onPressed: () => Navigator.of(context).pop(),

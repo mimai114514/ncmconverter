@@ -26,4 +26,25 @@ void main() {
     expect(settings.lastInputDirectory, r'E:\new-input');
     expect(settings.lastOutputDirectory, r'F:\new-output');
   });
+
+  test('Windows 音乐标签设置可独立持久化', () async {
+    SharedPreferences.setMockInitialValues({});
+    final settings = SettingsService.instance;
+    await settings.init();
+
+    expect(settings.windowsMusicTagEnabled, isFalse);
+    expect(settings.windowsMusicTagExecutablePath, isNull);
+
+    await settings.setWindowsMusicTagEnabled(true);
+    await settings.setWindowsMusicTagExecutablePath(
+      r'C:\MusicTag\MusicTag.exe',
+    );
+
+    expect(settings.windowsMusicTagEnabled, isTrue);
+    expect(settings.windowsMusicTagExecutablePath, r'C:\MusicTag\MusicTag.exe');
+
+    await settings.clearWindowsMusicTagExecutablePath();
+    expect(settings.windowsMusicTagExecutablePath, isNull);
+    expect(settings.windowsMusicTagEnabled, isTrue);
+  });
 }

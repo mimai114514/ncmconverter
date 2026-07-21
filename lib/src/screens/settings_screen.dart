@@ -1,5 +1,8 @@
 /// 设置页面
 
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/settings_service.dart';
@@ -15,6 +18,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late int _threadCount;
   late int _bufferSizeKB; // 以 KB 为单位
   late int _flushInterval;
+  late bool _windowsMusicTagEnabled;
+  String? _windowsMusicTagExecutablePath;
 
   @override
   void initState() {
@@ -22,6 +27,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _threadCount = SettingsService.instance.threadCount;
     _bufferSizeKB = SettingsService.instance.bufferSize ~/ 1024;
     _flushInterval = SettingsService.instance.flushInterval;
+    _windowsMusicTagEnabled = SettingsService.instance.windowsMusicTagEnabled;
+    _windowsMusicTagExecutablePath =
+        SettingsService.instance.windowsMusicTagExecutablePath;
   }
 
   @override
@@ -178,6 +186,51 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 16),
 
+          if (Platform.isWindows) ...[
+            const _SectionHeader(title: '音乐标签'),
+            SwitchListTile(
+              secondary: const Icon(Icons.music_note),
+              title: const Text('转换完成后打开音乐标签'),
+              subtitle: const Text('在完成弹窗中显示“打开音乐标签”操作'),
+              value: _windowsMusicTagEnabled,
+              onChanged: _updateWindowsMusicTagEnabled,
+            ),
+            ListTile(
+              enabled: _windowsMusicTagEnabled,
+              leading: const Icon(Icons.app_registration),
+              title: const Text('音乐标签程序'),
+              subtitle: Text(
+                _windowsMusicTagExecutablePath ?? '启用后选择音乐标签的 .exe 文件',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_windowsMusicTagExecutablePath != null)
+                    IconButton(
+                      tooltip: '清除程序路径',
+                      icon: const Icon(Icons.clear),
+                      onPressed: _windowsMusicTagEnabled
+                          ? _clearWindowsMusicTagExecutablePath
+                          : null,
+                    ),
+                  IconButton(
+                    tooltip: '选择程序路径',
+                    icon: const Icon(Icons.folder_open),
+                    onPressed: _windowsMusicTagEnabled
+                        ? _selectWindowsMusicTagExecutable
+                        : null,
+                  ),
+                ],
+              ),
+              onTap: _windowsMusicTagEnabled
+                  ? _selectWindowsMusicTagExecutable
+                  : null,
+            ),
+            const SizedBox(height: 16),
+          ],
+
           // 关于部分
           const _SectionHeader(title: '关于'),
           ListTile(
@@ -214,6 +267,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _flushInterval = clampedInterval;
     });
     SettingsService.instance.setFlushInterval(clampedInterval);
+  }
+
+  void _updateWindowsMusicTagEnabled(bool enabled) {
+    setState(() {
+      _windowsMusicTagEnabled = enabled;
+    });
+    SettingsService.instance.setWindowsMusicTagEnabled(enabled);
+  }
+
+  Future<void> _selectWindowsMusicTagExecutable() async {
+    final result = await FilePicker.platform.pickFiles(
+      dialogTitle: '选择音乐标签程序',
+      type: FileType.custom,
+      allowedExtensions: const ['exe'],
+    );
+    final path = result?.files.single.path;
+    if (path == null) {
+      return;
+    }
+
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _windowsMusicTagExecutablePath = path;
+    });
+    await SettingsService.instance.setWindowsMusicTagExecutablePath(path);
+  }
+
+  Future<void> _clearWindowsMusicTagExecutablePath() async {
+    setState(() {
+      _windowsMusicTagExecutablePath = null;
+    });
+    await SettingsService.instance.clearWindowsMusicTagExecutablePath();
   }
 
   /// 格式化缓冲区大小显示

@@ -21,6 +21,9 @@ class SettingsService {
   static const String _keyFlushInterval = 'flush_interval';
   static const String _keyLastInputDirectory = 'windows_last_input_directory';
   static const String _keyLastOutputDirectory = 'windows_last_output_directory';
+  static const String _keyWindowsMusicTagEnabled = 'windows_music_tag_enabled';
+  static const String _keyWindowsMusicTagExecutablePath =
+      'windows_music_tag_executable_path';
 
   /// 最大允许线程数
   static const int maxThreadCount = 32;
@@ -102,6 +105,34 @@ class SettingsService {
   Future<void> setLastOutputDirectory(String path) async {
     await _prefs?.setString(_keyLastOutputDirectory, path);
     debugPrint('[设置服务] 已记录 Windows 输出目录: $path');
+  }
+
+  /// 获取 Windows 音乐标签功能是否启用
+  bool get windowsMusicTagEnabled {
+    return _prefs?.getBool(_keyWindowsMusicTagEnabled) ?? false;
+  }
+
+  /// 设置 Windows 音乐标签功能是否启用
+  Future<void> setWindowsMusicTagEnabled(bool enabled) async {
+    await _prefs?.setBool(_keyWindowsMusicTagEnabled, enabled);
+    debugPrint('[设置服务] Windows 音乐标签功能已${enabled ? '启用' : '关闭'}');
+  }
+
+  /// 获取 Windows 音乐标签程序路径
+  String? get windowsMusicTagExecutablePath {
+    return _prefs?.getString(_keyWindowsMusicTagExecutablePath);
+  }
+
+  /// 设置 Windows 音乐标签程序路径
+  Future<void> setWindowsMusicTagExecutablePath(String path) async {
+    await _prefs?.setString(_keyWindowsMusicTagExecutablePath, path);
+    debugPrint('[设置服务] Windows 音乐标签程序路径已设置: $path');
+  }
+
+  /// 清除 Windows 音乐标签程序路径
+  Future<void> clearWindowsMusicTagExecutablePath() async {
+    await _prefs?.remove(_keyWindowsMusicTagExecutablePath);
+    debugPrint('[设置服务] Windows 音乐标签程序路径已清除');
   }
 
   /// 获取格式化的缓冲区大小显示文本
