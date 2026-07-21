@@ -19,6 +19,8 @@ class SettingsService {
   static const String _keyThreadCount = 'thread_count';
   static const String _keyBufferSize = 'buffer_size';
   static const String _keyFlushInterval = 'flush_interval';
+  static const String _keyLastInputDirectory = 'windows_last_input_directory';
+  static const String _keyLastOutputDirectory = 'windows_last_output_directory';
 
   /// 最大允许线程数
   static const int maxThreadCount = 32;
@@ -78,6 +80,28 @@ class SettingsService {
     final clampedInterval = interval.clamp(minFlushInterval, maxFlushInterval);
     await _prefs?.setInt(_keyFlushInterval, clampedInterval);
     debugPrint('[设置服务] 写入批次已设置为: 每批 $clampedInterval 块');
+  }
+
+  /// 获取 Windows 最近使用的输入目录
+  String? get lastInputDirectory {
+    return _prefs?.getString(_keyLastInputDirectory);
+  }
+
+  /// 记录 Windows 最近使用的输入目录
+  Future<void> setLastInputDirectory(String path) async {
+    await _prefs?.setString(_keyLastInputDirectory, path);
+    debugPrint('[设置服务] 已记录 Windows 输入目录: $path');
+  }
+
+  /// 获取 Windows 最近使用的输出目录
+  String? get lastOutputDirectory {
+    return _prefs?.getString(_keyLastOutputDirectory);
+  }
+
+  /// 记录 Windows 最近使用的输出目录
+  Future<void> setLastOutputDirectory(String path) async {
+    await _prefs?.setString(_keyLastOutputDirectory, path);
+    debugPrint('[设置服务] 已记录 Windows 输出目录: $path');
   }
 
   /// 获取格式化的缓冲区大小显示文本

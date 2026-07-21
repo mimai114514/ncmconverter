@@ -258,11 +258,20 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
+    final initialDirectory = Platform.isWindows
+        ? await _getWindowsInitialDirectory(
+            SettingsService.instance.lastInputDirectory,
+          )
+        : null;
     final result = await FilePicker.platform.getDirectoryPath(
       dialogTitle: '选择包含 NCM 文件的文件夹',
+      initialDirectory: initialDirectory,
     );
 
     if (result != null) {
+      if (Platform.isWindows) {
+        await SettingsService.instance.setLastInputDirectory(result);
+      }
       setState(() {
         _inputDir = result;
         _files = [];
@@ -336,14 +345,50 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _selectOutputDirectory() async {
+    final initialDirectory = Platform.isWindows
+        ? await _getWindowsInitialDirectory(
+            SettingsService.instance.lastOutputDirectory,
+          )
+        : null;
     final result = await FilePicker.platform.getDirectoryPath(
       dialogTitle: '选择输出目录',
+      initialDirectory: initialDirectory,
     );
 
     if (result != null) {
+      if (Platform.isWindows) {
+        await SettingsService.instance.setLastOutputDirectory(result);
+      }
       setState(() {
         _outputDir = result;
       });
+    }
+  }
+
+  Future<String?> _getWindowsInitialDirectory(
+    String? rememberedDirectory,
+  ) async {
+    if (await _directoryExists(rememberedDirectory)) {
+      return rememberedDirectory;
+    }
+
+    final userProfile = Platform.environment['USERPROFILE'];
+    if (await _directoryExists(userProfile)) {
+      return userProfile;
+    }
+
+    return null;
+  }
+
+  Future<bool> _directoryExists(String? path) async {
+    if (path == null || path.isEmpty) {
+      return false;
+    }
+
+    try {
+      return await Directory(path).exists();
+    } on FileSystemException {
+      return false;
     }
   }
 
