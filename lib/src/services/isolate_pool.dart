@@ -45,6 +45,7 @@ class IsolatePool {
   final int _maxSize;
   final List<_PooledIsolate> _isolates = [];
   final List<Completer<_PooledIsolate>> _waitingQueue = [];
+  int _creatingCount = 0;
   bool _isDisposed = false;
 
   /// 创建 Isolate 池
@@ -60,8 +61,9 @@ class IsolatePool {
     final warmUpCount = (count ?? _maxSize).clamp(1, _maxSize);
     debugPrint('[IsolatePool] 预热 $warmUpCount 个 Isolate');
 
-    final futures = <Future<void>>[];
-    for (var i = _isolates.length; i < warmUpCount; i++) {
+    final createCount = warmUpCount - (_isolates.length + _creatingCount);
+    final futures = <Future<_PooledIsolate>>[];
+    for (var i = 0; i < createCount; i++) {
       futures.add(_createIsolate());
     }
     await Future.wait(futures);
@@ -99,11 +101,8 @@ class IsolatePool {
     }
 
     // 如果池未满，创建新的 Isolate
-    if (_isolates.length < _maxSize) {
-      await _createIsolate();
-      final isolate = _isolates.last;
-      isolate.isBusy = true;
-      return isolate;
+    if (_isolates.length + _creatingCount < _maxSize) {
+      return _createIsolate(reservedForTask: true);
     }
 
     // 池已满，等待释放
@@ -126,9 +125,28 @@ class IsolatePool {
   }
 
   /// 创建新的 Isolate
-  Future<void> _createIsolate() async {
-    final isolate = await _PooledIsolate.spawn();
-    _isolates.add(isolate);
+  Future<_PooledIsolate> _createIsolate({bool reservedForTask = false}) async {
+    _creatingCount++;
+    try {
+      final isolate = await _PooledIsolate.spawn();
+      if (_isDisposed) {
+        isolate.dispose(StateError('IsolatePool 已被销毁'));
+        throw StateError('IsolatePool 已被销毁');
+      }
+
+      isolate.isBusy = reservedForTask;
+      _isolates.add(isolate);
+
+      if (!reservedForTask && _waitingQueue.isNotEmpty) {
+        isolate.isBusy = true;
+        final completer = _waitingQueue.removeAt(0);
+        completer.complete(isolate);
+      }
+
+      return isolate;
+    } finally {
+      _creatingCount--;
+    }
   }
 
   /// 销毁 Isolate 池
@@ -138,15 +156,17 @@ class IsolatePool {
 
     debugPrint('[IsolatePool] 销毁 ${_isolates.length} 个 Isolate');
 
+    final disposeError = StateError('IsolatePool 已被销毁');
+
     // 取消所有等待的任务
     for (final completer in _waitingQueue) {
-      completer.completeError(StateError('IsolatePool 已被销毁'));
+      completer.completeError(disposeError);
     }
     _waitingQueue.clear();
 
     // 销毁所有 Isolate
     for (final isolate in _isolates) {
-      isolate.dispose();
+      isolate.dispose(disposeError);
     }
     _isolates.clear();
   }
@@ -170,6 +190,7 @@ class _PooledIsolate {
   final SendPort _sendPort;
   final ReceivePort _resultPort;
   bool isBusy = false;
+  bool _isDisposed = false;
   int _taskId = 0;
   final Map<int, Completer<DecodeTaskResult>> _pendingTasks = {};
 
@@ -204,7 +225,11 @@ class _PooledIsolate {
   }
 
   /// 执行解密任务
-  Future<DecodeTaskResult> runDecode(DecodeTask task) async {
+  Future<DecodeTaskResult> runDecode(DecodeTask task) {
+    if (_isDisposed) {
+      return Future.error(StateError('Isolate 已被销毁'));
+    }
+
     final taskId = _taskId++;
     final completer = Completer<DecodeTaskResult>();
     _pendingTasks[taskId] = completer;
@@ -215,7 +240,18 @@ class _PooledIsolate {
   }
 
   /// 销毁此 Isolate
-  void dispose() {
+  void dispose([Object? error]) {
+    if (_isDisposed) return;
+    _isDisposed = true;
+
+    final disposeError = error ?? StateError('Isolate 已被销毁');
+    for (final completer in _pendingTasks.values) {
+      if (!completer.isCompleted) {
+        completer.completeError(disposeError);
+      }
+    }
+    _pendingTasks.clear();
+
     _resultPort.close();
     _isolate.kill(priority: Isolate.immediate);
   }

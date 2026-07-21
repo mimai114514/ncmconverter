@@ -139,6 +139,13 @@ class NcmDump {
     IOSink? outputSink;
 
     try {
+      if (bufferSize <= 0) {
+        return (false, '', '缓冲区大小必须大于 0');
+      }
+      if (flushInterval <= 0) {
+        return (false, '', '刷新间隔必须大于 0');
+      }
+
       final file = File(inputPath);
       if (!await file.exists()) {
         return (false, '', '文件不存在: $inputPath');
@@ -237,32 +244,35 @@ class NcmDump {
       final buffer = Uint8List(bufferSize);
       var globalOffset = 0;
       var remaining = audioLength;
-      var chunkCount = 0; // 块计数器
 
       while (remaining > 0) {
-        final toRead = remaining > bufferSize ? bufferSize : remaining;
-        final bytesRead = await raf.readInto(buffer, 0, toRead);
+        Stream<List<int>> decodeBatch() async* {
+          var batchChunkCount = 0;
+          while (remaining > 0 && batchChunkCount < flushInterval) {
+            final toRead = remaining > bufferSize ? bufferSize : remaining;
+            final bytesRead = await raf!.readInto(buffer, 0, toRead);
 
-        if (bytesRead == 0) break;
+            if (bytesRead == 0) {
+              remaining = 0;
+              break;
+            }
 
-        // 解密当前块
-        for (var i = 0; i < bytesRead; i++) {
-          final j = (globalOffset + i + 1) & 0xff;
-          buffer[i] ^=
-              keyBox[(keyBox[j] + keyBox[(keyBox[j] + j) & 0xff]) & 0xff];
+            for (var i = 0; i < bytesRead; i++) {
+              final j = (globalOffset + i + 1) & 0xff;
+              buffer[i] ^=
+                  keyBox[(keyBox[j] + keyBox[(keyBox[j] + j) & 0xff]) & 0xff];
+            }
+
+            globalOffset += bytesRead;
+            remaining -= bytesRead;
+            batchChunkCount++;
+            yield Uint8List.sublistView(buffer, 0, bytesRead);
+          }
         }
 
-        // 写入输出
-        outputSink.add(Uint8List.sublistView(buffer, 0, bytesRead));
-
-        globalOffset += bytesRead;
-        remaining -= bytesRead;
-        chunkCount++;
-
-        // 定期刷新以防止内存累积
-        if (chunkCount % flushInterval == 0) {
-          await outputSink.flush();
-        }
+        // addStream 会对文件写入施加背压，写完当前块后才读取下一块。
+        await outputSink.addStream(decodeBatch());
+        await outputSink.flush();
       }
 
       // 刷新并关闭
@@ -276,8 +286,12 @@ class NcmDump {
       return (true, outputPath, null);
     } catch (e) {
       // 清理资源
-      await outputSink?.close();
-      await raf?.close();
+      try {
+        await outputSink?.close();
+      } catch (_) {}
+      try {
+        await raf?.close();
+      } catch (_) {}
       return (false, '', '流式解密失败: $e');
     }
   }
