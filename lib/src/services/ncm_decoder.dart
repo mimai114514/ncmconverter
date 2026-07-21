@@ -3,6 +3,7 @@
 
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import '../core/ncm_dump.dart';
 import 'isolate_pool.dart';
@@ -71,7 +72,7 @@ class NcmDecoder {
   NcmDecoder._();
 
   /// 预热 Isolate 池
-  /// 建议在应用启动时调用
+  /// 建议在应用空闲时调用，避免阻塞启动关键路径
   Future<void> warmUp([int? count]) async {
     if (!_usePool) return;
 
@@ -214,7 +215,7 @@ class NcmDecoder {
     }
 
     // 限制并发数在合理范围内
-    final effectiveConcurrency = concurrency.clamp(1, 32);
+    final effectiveConcurrency = concurrency.clamp(1, math.min(total, 32));
     debugPrint('[解密服务] 使用 $effectiveConcurrency 个并行任务');
 
     // 从设置服务读取缓冲区参数
@@ -225,11 +226,6 @@ class NcmDecoder {
     debugPrint(
       '[解密服务] 缓冲区: ${effectiveBufferSize ~/ 1024}KB, 刷新间隔: 每 $effectiveFlushInterval 块',
     );
-
-    // 预热 Isolate 池
-    if (_usePool) {
-      await warmUp(effectiveConcurrency);
-    }
 
     // 使用 StreamController 来汇报进度
     final progressController = StreamController<BatchDecodeProgress>();
