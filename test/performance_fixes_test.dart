@@ -4,7 +4,9 @@ import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ncmpp_flutter/src/core/ncm_dump.dart';
+import 'package:ncmpp_flutter/src/core/ncm_performance_defaults.dart';
 import 'package:ncmpp_flutter/src/services/isolate_pool.dart';
+import 'package:ncmpp_flutter/src/services/settings_service.dart';
 import 'package:pointycastle/pointycastle.dart';
 
 void main() {
@@ -82,6 +84,18 @@ void main() {
     await pool.dispose();
 
     await expectLater(pending, throwsA(isA<StateError>()));
+  });
+
+  test('性能默认值使用基准测试选出的跨平台配置', () {
+    final concurrencyLimit = Platform.isWindows ? 16 : 8;
+
+    expect(NcmPerformanceDefaults.bufferSize, 512 * 1024);
+    expect(NcmPerformanceDefaults.flushInterval, 4);
+    expect(NcmPerformanceDefaults.concurrencyLimit, concurrencyLimit);
+    expect(
+      SettingsService.defaultThreadCount,
+      Platform.numberOfProcessors.clamp(1, concurrencyLimit),
+    );
   });
 }
 

@@ -6,6 +6,7 @@ import 'dart:io';
 import 'dart:isolate';
 import 'package:flutter/foundation.dart';
 import '../core/ncm_dump.dart';
+import '../core/ncm_performance_defaults.dart';
 
 /// 解密任务参数
 class DecodeTask {
@@ -19,8 +20,8 @@ class DecodeTask {
     this.inputPath,
     this.outputDir, {
     this.useStreaming = true,
-    this.bufferSize = 262144, // 256KB 默认值
-    this.flushInterval = 8, // 每 8 块刷新一次
+    this.bufferSize = NcmPerformanceDefaults.bufferSize,
+    this.flushInterval = NcmPerformanceDefaults.flushInterval,
   });
 }
 

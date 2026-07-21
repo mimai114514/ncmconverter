@@ -6,6 +6,7 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import '../core/ncm_dump.dart';
+import '../core/ncm_performance_defaults.dart';
 import 'isolate_pool.dart';
 import 'settings_service.dart';
 
@@ -89,7 +90,7 @@ class NcmDecoder {
   /// 解密单个文件（在后台 Isolate 执行）
   /// [useStreaming] 是否使用流式解密，默认 true（减少内存占用）
   /// [bufferSize] 缓冲区大小（字节），默认从设置读取
-  /// [flushInterval] 刷新间隔（每 N 块刷新），默认从设置读取
+  /// [flushInterval] 每个写入批次的块数，默认从设置读取
   Future<DecodeResult> decodeFile(
     String inputPath,
     String outputDir, {
@@ -98,8 +99,9 @@ class NcmDecoder {
     int? flushInterval,
   }) async {
     // 从设置服务读取默认值
-    final effectiveBufferSize = bufferSize ?? 262144; // 256KB 默认值
-    final effectiveFlushInterval = flushInterval ?? 8;
+    final effectiveBufferSize = bufferSize ?? NcmPerformanceDefaults.bufferSize;
+    final effectiveFlushInterval =
+        flushInterval ?? NcmPerformanceDefaults.flushInterval;
 
     if (_usePool) {
       // 使用 Isolate 池
@@ -188,7 +190,7 @@ class NcmDecoder {
   /// 返回一个 Stream，可以监听进度和结果
   /// [concurrency] 参数指定并行解密的数量，默认为1（顺序执行）
   /// [bufferSize] 缓冲区大小（字节），默认从设置读取
-  /// [flushInterval] 刷新间隔（每 N 块刷新），默认从设置读取
+  /// [flushInterval] 每个写入批次的块数，默认从设置读取
   Stream<BatchDecodeProgress> decodeDirectory({
     required String inputDir,
     required String outputDir,
@@ -224,7 +226,7 @@ class NcmDecoder {
     final effectiveFlushInterval =
         flushInterval ?? SettingsService.instance.flushInterval;
     debugPrint(
-      '[解密服务] 缓冲区: ${effectiveBufferSize ~/ 1024}KB, 刷新间隔: 每 $effectiveFlushInterval 块',
+      '[解密服务] 缓冲区: ${effectiveBufferSize ~/ 1024}KB, 写入批次: 每批 $effectiveFlushInterval 块',
     );
 
     // 使用 StreamController 来汇报进度
@@ -314,8 +316,12 @@ Future<DecodeResult> _decodeInIsolate(List<String> args) async {
   final inputPath = args[0];
   final outputDir = args[1];
   final useStreaming = args.length > 2 ? args[2] == 'true' : true;
-  final bufferSize = args.length > 3 ? int.tryParse(args[3]) ?? 262144 : 262144;
-  final flushInterval = args.length > 4 ? int.tryParse(args[4]) ?? 8 : 8;
+  final bufferSize = args.length > 3
+      ? int.tryParse(args[3]) ?? NcmPerformanceDefaults.bufferSize
+      : NcmPerformanceDefaults.bufferSize;
+  final flushInterval = args.length > 4
+      ? int.tryParse(args[4]) ?? NcmPerformanceDefaults.flushInterval
+      : NcmPerformanceDefaults.flushInterval;
 
   final ncmDump = NcmDump();
   final (success, outputPath, errorMessage) = useStreaming

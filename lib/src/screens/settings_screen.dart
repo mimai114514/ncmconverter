@@ -76,7 +76,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Text(
               '更多线程可以加快批量解密速度，但会占用更多系统资源。'
-              '建议设置为 CPU 核心数（默认: ${SettingsService.defaultThreadCount}）',
+              '默认根据平台与 CPU 核心数选择（当前默认: ${SettingsService.defaultThreadCount}）',
               style: TextStyle(fontSize: 12, color: theme.colorScheme.outline),
             ),
           ),
@@ -135,8 +135,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 12),
           ListTile(
             leading: const Icon(Icons.sync),
-            title: const Text('刷新间隔'),
-            subtitle: Text('每 $_flushInterval 块刷新一次'),
+            title: const Text('写入批次'),
+            subtitle: Text('每批 $_flushInterval 块'),
             trailing: SizedBox(
               width: 200,
               child: Row(
@@ -171,8 +171,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Text(
-              '控制写入数据后多久刷新到磁盘。较小的值可以减少内存占用，'
-              '较大的值可以提高写入速度。低内存设备建议设置为 4-8。',
+              '控制每次流式写入包含的缓冲块数量。默认 4 块，'
+              '更大的批次可以减少流切换次数。',
               style: TextStyle(fontSize: 12, color: theme.colorScheme.outline),
             ),
           ),

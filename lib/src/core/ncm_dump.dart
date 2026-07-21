@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:pointycastle/pointycastle.dart';
+import 'ncm_performance_defaults.dart';
 
 /// NCM 解密核心类
 class NcmDump {
@@ -126,14 +127,14 @@ class NcmDump {
 
   /// 流式解密 NCM 文件
   /// 使用流式 I/O 减少内存占用，适合大文件
-  /// [bufferSize] 缓冲区大小，默认 64KB
-  /// [flushInterval] 刷新间隔，每 N 个块刷新一次，默认 8
+  /// [bufferSize] 缓冲区大小，默认 512KB
+  /// [flushInterval] 写入批次，每批默认 4 个块
   /// 返回 (成功, 输出路径, 错误信息)
   Future<(bool, String, String?)> decodeStreaming(
     String inputPath,
     String outputDir, {
-    int bufferSize = 65536, // 64KB 缓冲区
-    int flushInterval = 8, // 每 8 块刷新一次
+    int bufferSize = NcmPerformanceDefaults.bufferSize,
+    int flushInterval = NcmPerformanceDefaults.flushInterval,
   }) async {
     RandomAccessFile? raf;
     IOSink? outputSink;
@@ -143,7 +144,7 @@ class NcmDump {
         return (false, '', '缓冲区大小必须大于 0');
       }
       if (flushInterval <= 0) {
-        return (false, '', '刷新间隔必须大于 0');
+        return (false, '', '写入批次必须大于 0');
       }
 
       final file = File(inputPath);
