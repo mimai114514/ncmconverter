@@ -18,6 +18,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late int _threadCount;
   late int _bufferSizeKB; // 以 KB 为单位
   late int _flushInterval;
+  late bool _copyUnencryptedAudio;
   late bool _windowsMusicTagEnabled;
   String? _windowsMusicTagExecutablePath;
 
@@ -27,6 +28,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _threadCount = SettingsService.instance.threadCount;
     _bufferSizeKB = SettingsService.instance.bufferSize ~/ 1024;
     _flushInterval = SettingsService.instance.flushInterval;
+    _copyUnencryptedAudio = SettingsService.instance.copyUnencryptedAudio;
     _windowsMusicTagEnabled = SettingsService.instance.windowsMusicTagEnabled;
     _windowsMusicTagExecutablePath =
         SettingsService.instance.windowsMusicTagExecutablePath;
@@ -186,6 +188,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 16),
 
+          const _SectionHeader(title: '文件处理'),
+          SwitchListTile(
+            secondary: const Icon(Icons.library_music),
+            title: const Text('同时复制非加密音频文件'),
+            subtitle: const Text('扫描并复制 MP3/FLAC 文件到输出目录'),
+            value: _copyUnencryptedAudio,
+            onChanged: _updateCopyUnencryptedAudio,
+          ),
+          const SizedBox(height: 16),
+
           if (Platform.isWindows) ...[
             const _SectionHeader(title: '音乐标签'),
             SwitchListTile(
@@ -267,6 +279,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _flushInterval = clampedInterval;
     });
     SettingsService.instance.setFlushInterval(clampedInterval);
+  }
+
+  void _updateCopyUnencryptedAudio(bool enabled) {
+    setState(() {
+      _copyUnencryptedAudio = enabled;
+    });
+    SettingsService.instance.setCopyUnencryptedAudio(enabled);
   }
 
   void _updateWindowsMusicTagEnabled(bool enabled) {

@@ -39,12 +39,17 @@ class _HomeScreenState extends State<HomeScreen> {
           IconButton(
             icon: const Icon(Icons.settings),
             tooltip: '设置',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const SettingsScreen()),
-              );
-            },
+            onPressed: _isProcessing
+                ? null
+                : () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const SettingsScreen(),
+                      ),
+                    );
+                    await _refreshInputFiles();
+                  },
           ),
         ],
       ),
@@ -61,7 +66,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
                 final inputCard = _buildDirectoryCard(
                   title: '输入目录',
-                  subtitle: _inputDir ?? '请选择包含 NCM 文件的文件夹',
+                  subtitle: _inputDir ?? _inputDirectoryHint,
                   icon: Icons.folder_open,
                   onTap: _isProcessing ? null : _selectInputDirectory,
                   color: theme.colorScheme.primaryContainer,
@@ -124,7 +129,7 @@ class _HomeScreenState extends State<HomeScreen> {
               label: Text(
                 _isProcessing
                     ? '正在处理...'
-                    : '开始解密${_files.isNotEmpty ? " (${_files.length})" : ""}',
+                    : '$_actionLabel${_files.isNotEmpty ? " (${_files.length})" : ""}',
               ),
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
@@ -169,7 +174,9 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 16),
               Text(
-                '选择输入目录后\n将在此显示 NCM 文件列表',
+                SettingsService.instance.copyUnencryptedAudio
+                    ? '选择输入目录后\n将在此显示 NCM、MP3 和 FLAC 文件列表'
+                    : '选择输入目录后\n将在此显示 NCM 文件列表',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Theme.of(context).colorScheme.outline),
               ),
@@ -250,6 +257,14 @@ class _HomeScreenState extends State<HomeScreen> {
       _outputDir != null &&
       _files.isNotEmpty;
 
+  String get _inputDirectoryHint =>
+      SettingsService.instance.copyUnencryptedAudio
+      ? '请选择包含 NCM、MP3 或 FLAC 文件的文件夹'
+      : '请选择包含 NCM 文件的文件夹';
+
+  String get _actionLabel =>
+      SettingsService.instance.copyUnencryptedAudio ? '开始处理' : '开始解密';
+
   Future<void> _selectInputDirectory() async {
     // 请求存储权限
     final hasPermission = await _requestStoragePermission();
@@ -264,7 +279,7 @@ class _HomeScreenState extends State<HomeScreen> {
           )
         : null;
     final result = await FilePicker.platform.getDirectoryPath(
-      dialogTitle: '选择包含 NCM 文件的文件夹',
+      dialogTitle: _inputDirectoryHint,
       initialDirectory: initialDirectory,
     );
 
@@ -279,17 +294,38 @@ class _HomeScreenState extends State<HomeScreen> {
         _failed = 0;
       });
 
-      // 扫描目录
-      final decoder = NcmDecoder.instance;
-      final filePaths = await decoder.scanNcmFiles(result);
+      await _refreshInputFiles();
+    }
+  }
 
-      setState(() {
-        _files = filePaths.map((p) => NcmFile.fromPath(p)).toList();
-      });
+  Future<void> _refreshInputFiles() async {
+    final inputDir = _inputDir;
+    if (inputDir == null || _isProcessing) {
+      return;
+    }
 
-      if (_files.isEmpty) {
-        _showSnackBar('该目录中没有找到 NCM 文件');
-      }
+    final includeUnencryptedAudio =
+        SettingsService.instance.copyUnencryptedAudio;
+    final filePaths = await NcmDecoder.instance.scanFiles(
+      inputDir,
+      includeUnencryptedAudio: includeUnencryptedAudio,
+    );
+    if (!mounted || inputDir != _inputDir) {
+      return;
+    }
+
+    setState(() {
+      _files = filePaths.map(NcmFile.fromPath).toList();
+      _completed = 0;
+      _failed = 0;
+    });
+
+    if (_files.isEmpty) {
+      _showSnackBar(
+        includeUnencryptedAudio
+            ? '该目录中没有找到 NCM、MP3 或 FLAC 文件'
+            : '该目录中没有找到 NCM 文件',
+      );
     }
   }
 
@@ -411,8 +447,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final decoder = NcmDecoder.instance;
 
-    await for (final progress in decoder.decodeDirectory(
-      inputDir: _inputDir!,
+    await for (final progress in decoder.processFiles(
+      inputFiles: _files.map((file) => file.path).toList(),
       outputDir: _outputDir!,
       concurrency: SettingsService.instance.threadCount,
       onFileComplete: (result) {
@@ -437,7 +473,7 @@ class _HomeScreenState extends State<HomeScreen> {
         // 标记当前正在处理的文件
         if (progress.currentFile != null) {
           final index = _files.indexWhere(
-            (f) => f.name == progress.currentFile,
+            (f) => f.path == progress.currentFilePath,
           );
           if (index >= 0 && _files[index].status == NcmFileStatus.pending) {
             _files[index].status = NcmFileStatus.processing;
@@ -487,7 +523,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     deleteSourceFiles = value ?? false;
                   });
                 },
-                title: const Text('删除转换成功的 .ncm 文件'),
+                title: Text(
+                  SettingsService.instance.copyUnencryptedAudio
+                      ? '删除已处理的文件'
+                      : '删除转换成功的 .ncm 文件',
+                ),
                 controlAffinity: ListTileControlAffinity.leading,
                 contentPadding: EdgeInsets.zero,
               ),

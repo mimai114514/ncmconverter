@@ -24,6 +24,7 @@ class SettingsService {
   static const String _keyWindowsMusicTagEnabled = 'windows_music_tag_enabled';
   static const String _keyWindowsMusicTagExecutablePath =
       'windows_music_tag_executable_path';
+  static const String _keyCopyUnencryptedAudio = 'copy_unencrypted_audio';
 
   /// 最大允许线程数
   static const int maxThreadCount = 32;
@@ -133,6 +134,17 @@ class SettingsService {
   Future<void> clearWindowsMusicTagExecutablePath() async {
     await _prefs?.remove(_keyWindowsMusicTagExecutablePath);
     debugPrint('[设置服务] Windows 音乐标签程序路径已清除');
+  }
+
+  /// 是否同时复制未加密的 MP3/FLAC 文件
+  bool get copyUnencryptedAudio {
+    return _prefs?.getBool(_keyCopyUnencryptedAudio) ?? false;
+  }
+
+  /// 设置是否同时复制未加密的 MP3/FLAC 文件
+  Future<void> setCopyUnencryptedAudio(bool enabled) async {
+    await _prefs?.setBool(_keyCopyUnencryptedAudio, enabled);
+    debugPrint('[设置服务] 同时复制非加密音频已${enabled ? '启用' : '关闭'}');
   }
 
   /// 获取格式化的缓冲区大小显示文本

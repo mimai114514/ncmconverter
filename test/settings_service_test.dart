@@ -47,4 +47,18 @@ void main() {
     expect(settings.windowsMusicTagExecutablePath, isNull);
     expect(settings.windowsMusicTagEnabled, isTrue);
   });
+
+  test('同时复制非加密音频设置默认关闭并可持久化', () async {
+    SharedPreferences.setMockInitialValues({});
+    final settings = SettingsService.instance;
+    await settings.init();
+
+    expect(settings.copyUnencryptedAudio, isFalse);
+
+    await settings.setCopyUnencryptedAudio(true);
+    expect(settings.copyUnencryptedAudio, isTrue);
+
+    await settings.init();
+    expect(settings.copyUnencryptedAudio, isTrue);
+  });
 }

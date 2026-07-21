@@ -50,12 +50,14 @@ class BatchDecodeProgress {
   final int completed;
   final int failed;
   final String? currentFile;
+  final String? currentFilePath;
 
   BatchDecodeProgress({
     required this.total,
     required this.completed,
     required this.failed,
     this.currentFile,
+    this.currentFilePath,
   });
 
   double get progress => total > 0 ? (completed + failed) / total : 0;
@@ -129,9 +131,59 @@ class NcmDecoder {
     }
   }
 
-  /// 扫描目录中的所有 NCM 文件
-  Future<List<String>> scanNcmFiles(String directoryPath) async {
-    final dir = Directory(directoryPath);
+  /// 扫描目录中的待处理文件
+  ///
+  /// 开启 [includeUnencryptedAudio] 后，同时扫描 MP3/FLAC。电脑端会识别
+  /// 网易云音乐的 CloudMusic 和 VipSongsDownload 目录结构。
+  Future<List<String>> scanFiles(
+    String directoryPath, {
+    bool includeUnencryptedAudio = false,
+  }) async {
+    final directories = <Directory>[Directory(directoryPath)];
+    if (includeUnencryptedAudio && !Platform.isAndroid) {
+      final selected = Directory(directoryPath);
+      final directoryName = _pathName(selected.path).toLowerCase();
+      if (directoryName == 'vipsongsdownload') {
+        directories.add(selected.parent);
+      } else if (directoryName == 'cloudmusic') {
+        directories.add(
+          Directory(
+            '${selected.path}${Platform.pathSeparator}VipSongsDownload',
+          ),
+        );
+      }
+    }
+
+    final files = <String>[];
+    final seenPaths = <String>{};
+    for (final directory in directories) {
+      final scanned = await _scanDirectory(
+        directory,
+        includeUnencryptedAudio: includeUnencryptedAudio,
+      );
+      for (final path in scanned) {
+        final comparisonPath = Platform.isWindows ? path.toLowerCase() : path;
+        if (seenPaths.add(comparisonPath)) {
+          files.add(path);
+        }
+      }
+    }
+
+    files.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    debugPrint('[文件扫描] 总共找到 ${files.length} 个待处理文件');
+    return files;
+  }
+
+  /// 扫描目录中的所有 NCM 文件，保留原有接口和行为。
+  Future<List<String>> scanNcmFiles(String directoryPath) {
+    return scanFiles(directoryPath);
+  }
+
+  Future<List<String>> _scanDirectory(
+    Directory dir, {
+    required bool includeUnencryptedAudio,
+  }) async {
+    final directoryPath = dir.path;
 
     // 检查目录是否存在
     bool exists;
@@ -158,9 +210,9 @@ class NcmDecoder {
         debugPrint('[NCM扫描] 检查: ${entity.path}');
         if (entity is File) {
           final path = entity.path.toLowerCase();
-          if (path.endsWith('.ncm')) {
+          if (_isSupportedFile(path, includeUnencryptedAudio)) {
             files.add(entity.path);
-            debugPrint('[NCM扫描] 添加 NCM 文件: ${entity.path}');
+            debugPrint('[文件扫描] 添加文件: ${entity.path}');
           }
         }
       }
@@ -172,7 +224,7 @@ class NcmDecoder {
         await for (final entity in dir.list(recursive: false)) {
           if (entity is File) {
             final path = entity.path.toLowerCase();
-            if (path.endsWith('.ncm')) {
+            if (_isSupportedFile(path, includeUnencryptedAudio)) {
               files.add(entity.path);
             }
           }
@@ -182,8 +234,20 @@ class NcmDecoder {
       }
     }
 
-    debugPrint('[NCM扫描] 总共找到 ${files.length} 个 NCM 文件');
     return files;
+  }
+
+  bool _isSupportedFile(String lowerCasePath, bool includeUnencryptedAudio) {
+    return lowerCasePath.endsWith('.ncm') ||
+        (includeUnencryptedAudio &&
+            (lowerCasePath.endsWith('.mp3') ||
+                lowerCasePath.endsWith('.flac')));
+  }
+
+  String _pathName(String path) {
+    final normalized = path.replaceAll(RegExp(r'[/\\]+$'), '');
+    final parts = normalized.split(RegExp(r'[/\\]'));
+    return parts.isEmpty ? normalized : parts.last;
   }
 
   /// 批量解密目录中的所有 NCM 文件
@@ -201,6 +265,26 @@ class NcmDecoder {
   }) async* {
     // 扫描所有 NCM 文件
     final files = await scanNcmFiles(inputDir);
+    yield* processFiles(
+      inputFiles: files,
+      outputDir: outputDir,
+      concurrency: concurrency,
+      bufferSize: bufferSize,
+      flushInterval: flushInterval,
+      onFileComplete: onFileComplete,
+    );
+  }
+
+  /// 处理指定文件列表：NCM 文件解密，MP3/FLAC 文件原样复制。
+  Stream<BatchDecodeProgress> processFiles({
+    required List<String> inputFiles,
+    required String outputDir,
+    int concurrency = 1,
+    int? bufferSize,
+    int? flushInterval,
+    void Function(DecodeResult)? onFileComplete,
+  }) async* {
+    final files = List<String>.from(inputFiles);
     final total = files.length;
     var completed = 0;
     var failed = 0;
@@ -255,16 +339,19 @@ class NcmDecoder {
               completed: completed,
               failed: failed,
               currentFile: currentFileName,
+              currentFilePath: filePath,
             ),
           );
 
           try {
-            final result = await decodeFile(
-              filePath,
-              outputDir,
-              bufferSize: effectiveBufferSize,
-              flushInterval: effectiveFlushInterval,
-            );
+            final result = _isUnencryptedAudio(filePath)
+                ? await _copyAudioFile(filePath, outputDir)
+                : await decodeFile(
+                    filePath,
+                    outputDir,
+                    bufferSize: effectiveBufferSize,
+                    flushInterval: effectiveFlushInterval,
+                  );
             if (result.success) {
               completed++;
             } else {
@@ -304,6 +391,41 @@ class NcmDecoder {
     // 转发进度事件
     await for (final progress in progressController.stream) {
       yield progress;
+    }
+  }
+
+  bool _isUnencryptedAudio(String path) {
+    final lowerCasePath = path.toLowerCase();
+    return lowerCasePath.endsWith('.mp3') || lowerCasePath.endsWith('.flac');
+  }
+
+  Future<DecodeResult> _copyAudioFile(
+    String inputPath,
+    String outputDir,
+  ) async {
+    final outputPath =
+        '$outputDir${Platform.pathSeparator}${_pathName(inputPath)}';
+    try {
+      final sourcePath = File(inputPath).absolute.path;
+      final destinationPath = File(outputPath).absolute.path;
+      final isSamePath = Platform.isWindows
+          ? sourcePath.toLowerCase() == destinationPath.toLowerCase()
+          : sourcePath == destinationPath;
+      if (!isSamePath) {
+        await File(inputPath).copy(outputPath);
+      }
+      return DecodeResult(
+        inputPath: inputPath,
+        outputPath: outputPath,
+        success: true,
+      );
+    } catch (e) {
+      return DecodeResult(
+        inputPath: inputPath,
+        outputPath: outputPath,
+        success: false,
+        errorMessage: e.toString(),
+      );
     }
   }
 
