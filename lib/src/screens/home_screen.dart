@@ -2,6 +2,7 @@
 
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -539,17 +540,26 @@ class _HomeScreenState extends State<HomeScreen> {
                 if (deleteSourceFiles) {
                   await _deleteSuccessfulSourceFiles();
                 }
-                if (Platform.isWindows) {
-                  await _openOutputFolder();
-                } else {
-                  await _openMusicTagEditor();
-                }
+                await _openOutputFolder();
                 if (context.mounted) {
                   Navigator.of(context).pop();
                 }
               },
-              child: Text(Platform.isWindows ? '打开文件夹' : '打开音乐标签'),
+              child: const Text('打开文件夹'),
             ),
+            if (Platform.isAndroid)
+              TextButton(
+                onPressed: () async {
+                  if (deleteSourceFiles) {
+                    await _deleteSuccessfulSourceFiles();
+                  }
+                  await _openMusicTagEditor();
+                  if (context.mounted) {
+                    Navigator.of(context).pop();
+                  }
+                },
+                child: const Text('打开音乐标签'),
+              ),
             if (canOpenWindowsMusicTag)
               TextButton(
                 onPressed: () async {
@@ -657,13 +667,44 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  /// 打开输出文件夹（Windows 平台）
-  Future<void> _openOutputFolder() async {
-    if (_outputDir == null) return;
+  static const MethodChannel _folderChannel = MethodChannel(
+    'io.github.mimai114514.ncmconverter/folder',
+  );
 
-    final uri = Uri.file(_outputDir!);
+  /// 打开输出文件夹（Windows / Android）
+  Future<void> _openOutputFolder() async {
+    final outputDir = _outputDir;
+    if (outputDir == null || outputDir.isEmpty) return;
+
     try {
-      await launchUrl(uri);
+      if (Platform.isWindows) {
+        final uri = Uri.file(outputDir);
+        final launched = await launchUrl(uri);
+        if (!launched && mounted) {
+          _showSnackBar('无法打开文件夹');
+        }
+        return;
+      }
+
+      if (Platform.isAndroid) {
+        final opened = await _folderChannel.invokeMethod<bool>(
+          'openFolder',
+          {'path': outputDir},
+        );
+        if (opened != true && mounted) {
+          _showSnackBar('无法打开文件夹，请确认已安装文件管理器');
+        }
+        return;
+      }
+
+      if (mounted) {
+        _showSnackBar('当前平台暂不支持打开文件夹');
+      }
+    } on PlatformException catch (e) {
+      debugPrint('[打开文件夹] 失败: ${e.message}');
+      if (mounted) {
+        _showSnackBar('无法打开文件夹');
+      }
     } catch (e) {
       debugPrint('[打开文件夹] 失败: $e');
       if (mounted) {

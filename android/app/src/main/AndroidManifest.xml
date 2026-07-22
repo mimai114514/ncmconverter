@@ -57,6 +57,15 @@
             <action android:name="android.intent.action.VIEW"/>
             <data android:scheme="http"/>
         </intent>
+        <!-- 允许查询可打开目录的文件管理器 -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:mimeType="vnd.android.document/directory"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:mimeType="resource/folder"/>
+        </intent>
         <!-- 音乐标签编辑器应用 -->
         <package android:name="com.xjcheng.musictageditor"/>
     </queries>
