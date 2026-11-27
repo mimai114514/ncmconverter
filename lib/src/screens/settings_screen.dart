@@ -7,6 +7,12 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/settings_service.dart';
 
+const String _appVersion = String.fromEnvironment(
+  'FLUTTER_BUILD_NAME',
+  defaultValue: 'dev',
+);
+const String _appBuildNumber = String.fromEnvironment('FLUTTER_BUILD_NUMBER');
+
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
@@ -364,6 +370,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showAboutDialog(BuildContext context) {
+    final versionText = _appBuildNumber.isEmpty
+        ? 'v$_appVersion'
+        : 'v$_appVersion (build $_appBuildNumber)';
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -398,7 +408,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 8),
             // 版本信息
             Text(
-              'v1.0.0',
+              versionText,
               style: TextStyle(
                 fontSize: 14,
                 color: Theme.of(context).colorScheme.outline,

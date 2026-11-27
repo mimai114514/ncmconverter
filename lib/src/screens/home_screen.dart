@@ -332,6 +332,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// 请求存储权限
   Future<bool> _requestStoragePermission() async {
+    // 桌面端（Windows/Linux）无需运行时存储权限
+    if (!Platform.isAndroid) {
+      return true;
+    }
+
     // Android 11+ (API 30+) 需要 MANAGE_EXTERNAL_STORAGE 权限
     if (await Permission.manageExternalStorage.isGranted) {
       return true;
@@ -683,6 +688,15 @@ class _HomeScreenState extends State<HomeScreen> {
         if (!launched && mounted) {
           _showSnackBar('无法打开文件夹');
         }
+        return;
+      }
+
+      if (Platform.isLinux) {
+        await Process.start(
+          'xdg-open',
+          [outputDir],
+          mode: ProcessStartMode.detached,
+        );
         return;
       }
 

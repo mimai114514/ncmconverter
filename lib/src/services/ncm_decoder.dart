@@ -428,9 +428,6 @@ class NcmDecoder {
       );
     }
   }
-
-  /// 获取版本
-  String getVersion() => '1.1.0';
 }
 
 /// Isolate 中执行的解密函数（用于回退模式）
