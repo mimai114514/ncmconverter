@@ -3,10 +3,12 @@ import 'package:flutter/scheduler.dart';
 import 'src/screens/home_screen.dart';
 import 'src/services/ncm_decoder.dart';
 import 'src/services/settings_service.dart';
+import 'src/services/telemetry_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SettingsService.instance.init();
+  await TelemetryService.instance.init();
   runApp(const NcmppApp());
 
   WidgetsBinding.instance.addPostFrameCallback((_) {

@@ -1,5 +1,6 @@
 /// 主界面
 
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -9,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../services/ncm_decoder.dart';
 import '../models/ncm_file.dart';
 import '../services/settings_service.dart';
+import '../services/telemetry_service.dart';
 import '../../widgets/progress_card.dart';
 import 'settings_screen.dart';
 
@@ -496,6 +498,17 @@ class _HomeScreenState extends State<HomeScreen> {
     // 停止计时并显示完成对话框
     stopwatch.stop();
     final elapsedSeconds = stopwatch.elapsed.inSeconds;
+    if (_files.isNotEmpty) {
+      TelemetryService.instance.track(
+        'convert.run',
+        durationMs: stopwatch.elapsedMilliseconds,
+        ok: _failed == 0,
+        errorCode: _failed > 0 ? 'partial_failure' : '',
+        count: _files.length,
+        failed: _failed,
+      );
+      unawaited(TelemetryService.instance.flush());
+    }
     if (mounted) {
       _showCompletionDialog(elapsedSeconds);
     }
@@ -692,19 +705,16 @@ class _HomeScreenState extends State<HomeScreen> {
       }
 
       if (Platform.isLinux) {
-        await Process.start(
-          'xdg-open',
-          [outputDir],
-          mode: ProcessStartMode.detached,
-        );
+        await Process.start('xdg-open', [
+          outputDir,
+        ], mode: ProcessStartMode.detached);
         return;
       }
 
       if (Platform.isAndroid) {
-        final opened = await _folderChannel.invokeMethod<bool>(
-          'openFolder',
-          {'path': outputDir},
-        );
+        final opened = await _folderChannel.invokeMethod<bool>('openFolder', {
+          'path': outputDir,
+        });
         if (opened != true && mounted) {
           _showSnackBar('无法打开文件夹，请确认已安装文件管理器');
         }

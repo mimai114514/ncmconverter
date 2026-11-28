@@ -49,6 +49,7 @@
     
     # 打开外部应用/链接
     url_launcher: ^6.2.5
+    package_info_plus: ^9.0.1
     
 
   dev_dependencies:
